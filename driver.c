@@ -38,7 +38,10 @@ int main( int argc, char* argv[] )
     //             "God damn old man, why ain't you gone?'\n",
     //             -1313, 90, 235, 1313 );
 
-    a = MyPrintf("Hello %d\n", 65 );
+    a = MyPrintf("Hello %c\n", 65 );
+    a = MyPrintf("Hello %c\n", 65 );
+    a = MyPrintf("Hello %c\n", 65 );
+    a = MyPrintf("Hello %c\n", 65 );
 
     return 0;
 }

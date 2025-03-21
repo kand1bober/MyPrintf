@@ -96,11 +96,9 @@ print_loop:
     mov dl, 0 
     cmp al, dl 
     je _output_end
-
-    push rsi 
+ 
     jmp Putchar         ; output
 Putchar_end:
-    pop rsi 
 
     xor rcx, rcx        ; delete counter        
     dec rcx             ;
@@ -155,6 +153,10 @@ _putc_write:
 ;               (OwerwriteArg)
 ;   Arguments, already converted to strings
 ;   are writed over specificators 
+;
+; Entry: 
+;   rsi is set to string(ended with 0) 
+;   with argument 
 ;
 ;------------------------------------------------
 OverwriteArg:
@@ -257,7 +259,7 @@ _ArgType_end:
 ;   Handles the flushing of buffer 
 ;
 ; Entry:
-;
+;   al = symbol to write 
 ; Exit:
 ;
 ;------------------------------------------------
@@ -302,7 +304,7 @@ _buf_end:
 ;   Manual mode of flushing buffer 
 ;
 ; Entry:
-;
+;  
 ; Exit:
 ;
 ;------------------------------------------------
@@ -503,7 +505,8 @@ _string_process:
 ;------------------------------------------------
 _char_process:
     
-    mov [char_buf], rsi
+    mov rdx, rsi
+    mov [char_buf], dl
     mov rsi, char_buf
 
     jmp _arg_process_end
