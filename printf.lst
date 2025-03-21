@@ -1,0 +1,522 @@
+     1                                  ;
+     2                                  ; In this programm I use HUYCALL calling convention
+     3                                  ;
+     4                                  ;   addr of args = R9, 
+     5                                  ;   stack: [R9] = 1 --> 2 --> 3 --> ... 
+     6                                  ;               +1*8  +2*8  +3*8  ...
+     7                                  ;------------------------------------------------
+     8                                  section .data
+     9 00000000 0000000000000000            output_buf_shift:     dq 0
+    10 00000008 00<rep 100h>                output_buf: times 256 db 0       
+    11                                      output_buf_size equ $ - output_buf               
+    12                                  
+    13 00000108 0100000000000000            arg_counter: dq 1        ; counts amount of written args 
+    14                                  
+    15 00000110 00<rep 1Eh>                 convert_num_buf: times 30 db 0  ; can fit any number, and unused bytes will be 0( print nothing )
+    16                                      convert_num_buf_size equ $ - convert_num_buf
+    17                                  
+    18 0000012E 0000                        char_buf: db 0, 0 
+    19                                  
+    20 00000130 303132333435363738-         hex_digits: db '0123456789abcdef', 0
+    20 00000139 3961626364656600   
+    21                                  
+    22 00000141 0100                        IS_ARG      dw 1         ; const 
+    23 00000143 0700                        NO_ARG      dw 7         ; const 
+    24                                  
+    25                                      DECIMAL     equ 0         ; const %d  |
+    26                                      OCTAL       equ 1         ; const %o  |
+    27                                      HEXADEMICAL equ 2         ; const %x  | 
+    28                                      BINAR       equ 3         ; const %b  |--------->>> Формируется джамп таблица 
+    29                                      STRING      equ 4         ; const %s  |
+    30                                      CHAR        equ 5         ; const %c  |
+    31                                      
+    32 00000145 427566666572206F65-         err_msg: db 'Buffer oerflowed', 0
+    32 0000014E 72666C6F77656400   
+    33                                      err_len equ $ - err_msg 
+    34                                  
+    35 00000156 0A00                        new_line: db 10, 0
+    36                                  ;------------------------------------------------
+    37                                  
+    38                                  section .text
+    39                                      global MyPrintf
+    40                                  
+    41                                  ;------------------------------------------------
+    42                                  ;               JUMP TABLE 
+    43                                  _arg_process:
+    44 00000000 E9B5010000                  jmp _decimal_process    ;|
+    45 00000005 E9FB010000                  jmp _octal_process      ;|
+    46 0000000A E926020000                  jmp _hex_process        ;|
+    47 0000000F E954020000                  jmp _binar_process      ;|<<--------- Jump Table 
+    48 00000014 E97F020000                  jmp _string_process     ;|
+    49 00000019 E97F020000                  jmp _char_process       ;|
+    50                                  ;------------------------------------------------
+    51                                  
+    52                                  MyPrintf:   
+    53                                  ; ----------------
+    54 0000001E 58                          pop rax     ; save return addr 
+    55                                  
+    56 0000001F 4151                        push r9     ;
+    57 00000021 4150                        push r8     ; 
+    58 00000023 51                          push rcx    ;  saving arguments 
+    59 00000024 52                          push rdx    ;  
+    60 00000025 56                          push rsi    ;
+    61 00000026 57                          push rdi    ;
+    62 00000027 4989E1                      mov r9, rsp ; <======  DON'T TOUCH THIS MAN !!!!!!!!
+    63                                      
+    64 0000002A 50                          push rax    ; push return addr
+    65                                  ;----------------
+    66                                  
+    67 0000002B 55                          push rbp 
+    68 0000002C 4889E5                      mov rbp, rsp 
+    69                                  
+    70 0000002F E80C000000                  call Output         ; begin output
+    71 00000034 E831010000                  call BufferFlush    ; flush remaining part
+    72                                  
+    73 00000039 B800000000                  mov rax, 0          ; quit
+    74 0000003E C9                          leave               ;
+    75 0000003F C3                          ret                 ;
+    76                                  ;------------------------------------------------
+    77                                  
+    78                                  
+    79                                  ;------------------------------------------------
+    80                                  ;               (Output)
+    81                                  ;    
+    82                                  ; Entry:
+    83                                  ;
+    84                                  ; Exit:
+    85                                  ;
+    86                                  ;------------------------------------------------
+    87                                  Output:
+    88 00000040 55                          push rbp 
+    89 00000041 4889E5                      mov rbp, rsp 
+    90                                  
+    91 00000044 4831C9                      xor rcx, rcx        ; delete counter        
+    92 00000047 48FFC9                      dec rcx             ;
+    93 0000004A 498B31                      mov rsi, [r9]       ; = format string( 1 argument )   
+    94                                  print_loop:  
+    95 0000004D AC                          lodsb               ; rsi --> al   stosb = al --> rdi 
+    96 0000004E B200                        mov dl, 0 
+    97 00000050 38D0                        cmp al, dl 
+    98 00000052 740C                        je _output_end
+    99                                  
+   100 00000054 56                          push rsi 
+   101 00000055 EB0B                        jmp Putchar         ; output
+   102                                  Putchar_end:
+   103 00000057 5E                          pop rsi 
+   104                                  
+   105 00000058 4831C9                      xor rcx, rcx        ; delete counter        
+   106 0000005B 48FFC9                      dec rcx             ;
+   107 0000005E E2ED                        loop print_loop 
+   108                                  
+   109                                  _output_end:
+   110 00000060 C9                          leave 
+   111 00000061 C3                          ret 
+   112                                  ;------------------------------------------------
+   113                                  
+   114                                  
+   115                                  ;------------------------------------------------
+   116                                  ;               (Putchar)
+   117                                  ;   Moves symbols to the buffer  
+   118                                  ;
+   119                                  ; Entry:
+   120                                  ;
+   121                                  ; Exit:
+   122                                  ;
+   123                                  ;------------------------------------------------
+   124                                  Putchar:
+   125 00000062 3C25                        cmp al, '%'                    ;TODO: добавить IsArgument проверку по следующему символу 
+   126                                  ;if( != % )
+   127 00000064 7534                        jne _putc_write
+   128                                  ;else
+   129 00000066 AC                          lodsb                   ; skip %, go to next symbol
+   130 00000067 E863000000                  call ArgType  
+   131 0000006C 56                          push rsi                ; save shift in format string
+   132                                  
+   133 0000006D 488B3425[08010000]          mov rsi, [arg_counter]  ; shift from  
+   134 00000075 486BF608                    imul rsi, 8             ; beginning 
+   135 00000079 4C01CE                      add rsi, r9             ; begin of args in stack
+   136 0000007C 488B36                      mov rsi, [rsi]
+   137                                  
+   138 0000007F 48BA-                       mov rdx, _arg_process   ;
+   138 00000081 [0000000000000000] 
+   139 00000089 486BC005                    imul rax, 5             ; modifing addres of jump
+   140 0000008D 4801C2                      add rdx, rax            ;
+   141 00000090 FFE2                        jmp rdx                 ; process argument
+   142                                  _arg_process_end: 
+   143 00000092 E80A000000                  call OverwriteArg 
+   144 00000097 5E                          pop rsi                 ; return shift in format string
+   145 00000098 EBBD                        jmp Putchar_end  
+   146                                  
+   147                                  
+   148                                  _putc_write: 
+   149 0000009A E884000000                  call BufferHandler  
+   150 0000009F EBB6                        jmp Putchar_end 
+   151                                  ;------------------------------------------------
+   152                                  
+   153                                  
+   154                                  ;------------------------------------------------
+   155                                  ;               (OwerwriteArg)
+   156                                  ;   Arguments, already converted to strings
+   157                                  ;   are writed over specificators 
+   158                                  ;
+   159                                  ;------------------------------------------------
+   160                                  OverwriteArg:
+   161 000000A1 55                          push rbp 
+   162 000000A2 4889E5                      mov rbp, rsp 
+   163                                  
+   164                                      ;------------------------
+   165 000000A5 4831C9                      xor rcx, rcx            ; 
+   166 000000A8 48FFC9                      dec rcx                 ; infinite cycle 
+   167                                  _overwrite:
+   168 000000AB B200                        mov dl, 0               ; terminating of string
+   169 000000AD 3816                        cmp [rsi], dl           ;
+   170 000000AF 7410                        je _overwrite_end       ; leave, when \0
+   171                                  
+   172 000000B1 AC                          lodsb                   ; rsi -->> al
+   173 000000B2 56                          push rsi 
+   174 000000B3 E86B000000                  call BufferHandler      ; al -->> rdi 
+   175 000000B8 5E                          pop rsi 
+   176                                  
+   177 000000B9 4831C9                      xor rcx, rcx            ; 
+   178 000000BC 48FFC9                      dec rcx                 ; infinite cycle 
+   179 000000BF E2EA                        loop _overwrite
+   180                                      ;------------------------
+   181                                  
+   182                                  _overwrite_end:
+   183 000000C1 BA01000000                  mov edx, 1
+   184 000000C6 011425[08010000]            add [arg_counter], edx  
+   185                                  
+   186 000000CD C9                          leave
+   187 000000CE C3                          ret
+   188                                  ;------------------------------------------------
+   189                                  
+   190                                  
+   191                                  ;------------------------------------------------
+   192                                  ;               (ArgType)
+   193                                  ;   Returns the type of ArgType 
+   194                                  ;
+   195                                  ; Entry:
+   196                                  ;   al = symbol 
+   197                                  ; Exit:
+   198                                  ;   rax = code of specifier
+   199                                  ;------------------------------------------------
+   200                                  ArgType:
+   201 000000CF 55                          push rbp 
+   202 000000D0 4889E5                      mov rbp, rsp 
+   203                                  
+   204 000000D3 B364                        mov bl, 'd'
+   205 000000D5 38C3                        cmp bl, al 
+   206 000000D7 741E                        je _arg_is_dec 
+   207                                  
+   208 000000D9 B36F                        mov bl, 'o'
+   209 000000DB 38C3                        cmp bl, al                          ; МОЖНО ДЖАМП ТАБЛИЦУ ЕБАНУТЬ 
+   210 000000DD 741F                        je _arg_is_oct 
+   211                                  
+   212 000000DF B378                        mov bl, 'x'
+   213 000000E1 38C3                        cmp bl, al 
+   214 000000E3 7420                        je _arg_is_hex
+   215                                  
+   216 000000E5 B362                        mov bl, 'b'
+   217 000000E7 38C3                        cmp bl, al 
+   218 000000E9 7421                        je _arg_is_bin
+   219                                  
+   220 000000EB B373                        mov bl, 's'
+   221 000000ED 38C3                        cmp bl, al 
+   222 000000EF 7422                        je _arg_is_str
+   223                                  
+   224 000000F1 B363                        mov bl, 'c'
+   225 000000F3 38C3                        cmp bl, al 
+   226 000000F5 7423                        je _arg_is_chr
+   227                                  
+   228                                  
+   229                                  _arg_is_dec:
+   230 000000F7 B800000000                  mov rax, qword DECIMAL 
+   231 000000FC EB23                        jmp _ArgType_end
+   232                                  _arg_is_oct:
+   233 000000FE B801000000                  mov rax, qword OCTAL  
+   234 00000103 EB1C                        jmp _ArgType_end
+   235                                  _arg_is_hex:
+   236 00000105 B802000000                  mov rax, qword HEXADEMICAL 
+   237 0000010A EB15                        jmp _ArgType_end
+   238                                  _arg_is_bin:
+   239 0000010C B803000000                  mov rax, qword BINAR
+   240 00000111 EB0E                        jmp _ArgType_end
+   241                                  _arg_is_str:
+   242 00000113 B804000000                  mov rax, qword STRING 
+   243 00000118 EB07                        jmp _ArgType_end
+   244                                  _arg_is_chr:
+   245 0000011A B805000000                  mov rax, qword CHAR
+   246 0000011F EB00                        jmp _ArgType_end
+   247                                  
+   248                                  
+   249                                  _ArgType_end:
+   250 00000121 C9                          leave 
+   251 00000122 C3                          ret 
+   252                                  ;------------------------------------------------
+   253                                  
+   254                                  
+   255                                  ;------------------------------------------------
+   256                                  ;               (BufferHandler)
+   257                                  ;   Handles the flushing of buffer 
+   258                                  ;
+   259                                  ; Entry:
+   260                                  ;
+   261                                  ; Exit:
+   262                                  ;
+   263                                  ;------------------------------------------------
+   264                                  BufferHandler:
+   265 00000123 55                          push rbp 
+   266 00000124 4889E5                      mov rbp, rsp 
+   267                                  
+   268 00000127 BB00010000                  mov rbx, output_buf_size
+   269 0000012C 483B1C25[00000000]          cmp rbx, [output_buf_shift]
+   270 00000134 7F04                        jg _buf_store
+   271 00000136 7409                        je _buf_flush  
+   272 00000138 7C13                        jl _buf_overflow
+   273                                  
+   274                                  _buf_store:
+   275 0000013A E85A000000                  call BufferStore 
+   276 0000013F EB27                        jmp _buf_end 
+   277                                      
+   278                                  _buf_flush:
+   279                                      ; push rax            ; rember not written symbol 
+   280                                      ; push rsi            ; and it's position 
+   281 00000141 E824000000                  call BufferFlush
+   282                                      ; pop rsi             ; return symbol 
+   283                                      ; pop rax             ; and position
+   284 00000146 E84E000000                  call BufferStore
+   285 0000014B EB1B                        jmp _buf_end 
+   286                                  
+   287                                  _buf_overflow:
+   288 0000014D B801000000                  mov rax, 1
+   289 00000152 BF01000000                  mov rdi, 1
+   290 00000157 48BE-                       mov rsi, err_msg 
+   290 00000159 [4501000000000000] 
+   291 00000161 BA11000000                  mov rdx, err_len
+   292 00000166 EB00                        jmp _buf_end 
+   293                                  
+   294                                  _buf_end:
+   295 00000168 C9                          leave
+   296 00000169 C3                          ret 
+   297                                  ;------------------------------------------------
+   298                                  
+   299                                  
+   300                                  ;------------------------------------------------
+   301                                  ;               (BufferFlush)
+   302                                  ;   Manual mode of flushing buffer 
+   303                                  ;
+   304                                  ; Entry:
+   305                                  ;
+   306                                  ; Exit:
+   307                                  ;
+   308                                  ;------------------------------------------------
+   309                                  BufferFlush:
+   310 0000016A 55                          push rbp 
+   311 0000016B 4889E5                      mov rbp, rsp 
+   312                                  
+   313 0000016E B801000000                  mov rax, 1
+   314 00000173 BF01000000                  mov rdi, 1
+   315 00000178 48BE-                       mov rsi, output_buf              
+   315 0000017A [0800000000000000] 
+   316 00000182 488B1425[00000000]          mov rdx, qword [output_buf_shift]                    
+   317 0000018A 0F05                        syscall                         ; buffer flush 
+   318                                  
+   319 0000018C 4831D2                      xor rdx, rdx 
+   320 0000018F 48891425[00000000]          mov [output_buf_shift], rdx 
+   321                                  
+   322 00000197 C9                          leave
+   323 00000198 C3                          ret 
+   324                                  ;------------------------------------------------
+   325                                  
+   326                                  
+   327                                  
+   328                                  ;------------------------------------------------
+   329                                  ;               (BufferStore)
+   330                                  ;   Manual mode of storing buffer 
+   331                                  ;
+   332                                  ; Entry:
+   333                                  ;
+   334                                  ; Exit:
+   335                                  ;
+   336                                  ;------------------------------------------------
+   337                                  BufferStore:
+   338 00000199 55                          push rbp 
+   339 0000019A 4889E5                      mov rbp, rsp 
+   340                                  
+   341 0000019D 48BF-                       mov rdi, output_buf 
+   341 0000019F [0800000000000000] 
+   342 000001A7 48033C25[00000000]          add rdi, [output_buf_shift]
+   343 000001AF AA                          stosb                           ; al --> rdi = buffer 
+   344 000001B0 48FF0425[00000000]          inc qword [output_buf_shift]
+   345                                  
+   346 000001B8 C9                          leave
+   347 000001B9 C3                          ret 
+   348                                  ;------------------------------------------------
+   349                                  
+   350                                  
+   351                                  
+   352                                  ;------------------------------------------------
+   353                                  ;   Changes symbol in the stack to addr of
+   354                                  ;   it's string representation ended with \0
+   355                                  ;
+   356                                  ; Entry: rsi points to argument
+   357                                  ;
+   358                                  ; Exit: rsi points to string, that contains 
+   359                                  ;       ready to print argument 
+   360                                  ;
+   361                                  ;------------------------------------------------
+   362                                  _decimal_process: 
+   363 000001BA 4889F0                      mov rax, rsi                ; take number to convert 
+   364 000001BD 480FBFC0                    movsx rax, ax               ; int(4 bytes) to 8 bytes 
+   365 000001C1 50                          push rax 
+   366 000001C2 4883F800                    cmp rax, 0
+   367 000001C6 7D03                        jge _begin_convert_dec
+   368 000001C8 48F7D8                      neg rax
+   369                                  
+   370                                  _begin_convert_dec:
+   371 000001CB 48B9-                       mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
+   371 000001CD [2C01000000000000] 
+   372 000001D5 BB0A000000                  mov rbx, 10                 ; number system size 
+   373                                  _convert_loop:
+   374 000001DA 4831D2                      xor rdx, rdx 
+   375 000001DD 48F7F3                      div rbx 
+   376 000001E0 80C230                      add dl, '0' 
+   377 000001E3 8811                        mov [rcx], dl               ; bytes count from 0, iteration from 1
+   378 000001E5 48FFC9                      dec rcx                     ;
+   379 000001E8 4885C0                      test rax, rax               ; cmp rax with 0
+   380 000001EB 75ED                        jne _convert_loop
+   381                                  
+   382 000001ED 58                          pop rax 
+   383 000001EE 4883F800                    cmp rax, 0 
+   384 000001F2 7D06                        jge _end_convert_dec
+   385 000001F4 C6012D                      mov byte [rcx], '-'
+   386 000001F7 48FFC9                      dec rcx 
+   387                                  
+   388                                  _end_convert_dec:
+   389 000001FA 4889CE                      mov rsi, rcx                ; change number value to addr of string 
+   390 000001FD 48FFC6                      inc rsi                     ; подгон shift'a
+   391 00000200 E98DFEFFFF                  jmp _arg_process_end    
+   392                                  ;------------------------------------------------
+   393                                  
+   394                                  
+   395                                  ;------------------------------------------------
+   396                                  ;   Changes symbol in the stack to addr of
+   397                                  ;   it's string representation ended with \0
+   398                                  ;
+   399                                  ; Entry: rsi points to argument
+   400                                  ;
+   401                                  ; Exit: rsi points to string, that contains 
+   402                                  ;       ready to print argument 
+   403                                  ;
+   404                                  ;------------------------------------------------
+   405                                  _octal_process:
+   406                                  
+   407 00000205 4889F0                      mov rax, rsi                ; take number to convert 
+   408 00000208 48B9-                       mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
+   408 0000020A [2C01000000000000] 
+   409 00000212 BB08000000                  mov rbx, 8                  ; number system size 
+   410                                  _convert_dec_loop:
+   411 00000217 4831D2                      xor rdx, rdx 
+   412 0000021A 48F7F3                      div rbx 
+   413 0000021D 80C230                      add dl, '0' 
+   414 00000220 8811                        mov [rcx], dl               ; bytes count from 0, iteration from 1
+   415 00000222 48FFC9                      dec rcx                     ;
+   416 00000225 4885C0                      test rax, rax               ; cmp rax with 0
+   417 00000228 75ED                        jne _convert_dec_loop
+   418                                  
+   419 0000022A 4889CE                      mov rsi, rcx
+   420 0000022D 48FFC6                      inc rsi 
+   421                                  
+   422 00000230 E95DFEFFFF                  jmp _arg_process_end
+   423                                  ;------------------------------------------------
+   424                                  
+   425                                  
+   426                                  ;------------------------------------------------
+   427                                  ;   Changes symbol in the stack to addr of
+   428                                  ;   it's string representation ended with \0
+   429                                  ;
+   430                                  ; Entry: rsi points to argument
+   431                                  ;
+   432                                  ; Exit: rsi points to string, that contains 
+   433                                  ;       ready to print argument 
+   434                                  ;
+   435                                  ;------------------------------------------------
+   436                                  _hex_process:     
+   437                                  
+   438 00000235 4889F0                      mov rax, rsi              ; take number to convert 
+   439 00000238 48B9-                       mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
+   439 0000023A [2C01000000000000] 
+   440 00000242 BB10000000                  mov rbx, 16                 ; number system size 
+   441                                  _convert_hex_loop:
+   442 00000247 4831D2                      xor rdx, rdx 
+   443 0000024A 48F7F3                      div rbx 
+   444 0000024D 8A92[30010000]              mov dl, [hex_digits + rdx]
+   445 00000253 8811                        mov [rcx], dl               ; bytes count from 0, iteration from 1
+   446 00000255 48FFC9                      dec rcx                     ;
+   447 00000258 4885C0                      test rax, rax               ; cmp rax with 0
+   448 0000025B 75EA                        jne _convert_hex_loop
+   449                                  
+   450 0000025D 4889CE                      mov rsi, rcx
+   451 00000260 48FFC6                      inc rsi 
+   452                                  
+   453 00000263 E92AFEFFFF                  jmp _arg_process_end
+   454                                  ;------------------------------------------------
+   455                                  
+   456                                  
+   457                                  ;------------------------------------------------
+   458                                  ;   Changes symbol in the stack to addr of
+   459                                  ;   it's string representation ended with \0
+   460                                  ;
+   461                                  ; Entry: rsi points to argument
+   462                                  ;
+   463                                  ; Exit: rsi points to string, that contains 
+   464                                  ;       ready to print argument 
+   465                                  ;
+   466                                  ;------------------------------------------------
+   467                                  _binar_process:    
+   468                                  
+   469 00000268 4889F0                      mov rax, rsi                ; take number to convert 
+   470 0000026B 48B9-                       mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
+   470 0000026D [2C01000000000000] 
+   471 00000275 BB02000000                  mov rbx, 2                  ; number system size 
+   472                                  _convert_bin_loop:
+   473 0000027A 4831D2                      xor rdx, rdx 
+   474 0000027D 48F7F3                      div rbx 
+   475 00000280 80C230                      add dl, '0' 
+   476 00000283 8811                        mov [rcx], dl               ; bytes count from 0, iteration from 1
+   477 00000285 48FFC9                      dec rcx                     ;
+   478 00000288 4885C0                      test rax, rax               ; cmp rax with 0
+   479 0000028B 75ED                        jne _convert_bin_loop
+   480                                  
+   481 0000028D 4889CE                      mov rsi, rcx
+   482 00000290 48FFC6                      inc rsi 
+   483                                  
+   484 00000293 E9FAFDFFFF                  jmp _arg_process_end
+   485                                  ;------------------------------------------------
+   486                                  
+   487                                  
+   488                                  ;------------------------------------------------
+   489                                  _string_process:  
+   490 00000298 E9F5FDFFFF                  jmp _arg_process_end
+   491                                  ;------------------------------------------------
+   492                                  
+   493                                  
+   494                                  ;------------------------------------------------
+   495                                  ;   Changes symbol in the stack to addr of
+   496                                  ;   it's string representation ended with \0
+   497                                  ;
+   498                                  ; Entry: rsi points to argument
+   499                                  ;
+   500                                  ; Exit: rsi points to string, that contains 
+   501                                  ;       ready to print argument 
+   502                                  ;
+   503                                  ;------------------------------------------------
+   504                                  _char_process:
+   505                                      
+   506 0000029D 48893425[2E010000]          mov [char_buf], rsi
+   507 000002A5 48BE-                       mov rsi, char_buf
+   507 000002A7 [2E01000000000000] 
+   508                                  
+   509 000002AF E9DEFDFFFF                  jmp _arg_process_end
+   510                                  ;------------------------------------------------
+   511                                  
