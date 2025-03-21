@@ -43,12 +43,12 @@
     41                                  ;------------------------------------------------
     42                                  ;               JUMP TABLE 
     43                                  _arg_process:
-    44 00000000 E9B5010000                  jmp _decimal_process    ;|
-    45 00000005 E9FB010000                  jmp _octal_process      ;|
-    46 0000000A E926020000                  jmp _hex_process        ;|
-    47 0000000F E954020000                  jmp _binar_process      ;|<<--------- Jump Table 
-    48 00000014 E97F020000                  jmp _string_process     ;|
-    49 00000019 E97F020000                  jmp _char_process       ;|
+    44 00000000 E9B9010000                  jmp _decimal_process    ;|
+    45 00000005 E9FF010000                  jmp _octal_process      ;|
+    46 0000000A E92A020000                  jmp _hex_process        ;|
+    47 0000000F E958020000                  jmp _binar_process      ;|<<--------- Jump Table 
+    48 00000014 E983020000                  jmp _string_process     ;|
+    49 00000019 E983020000                  jmp _char_process       ;|
     50                                  ;------------------------------------------------
     51                                  
     52                                  MyPrintf:   
@@ -70,7 +70,7 @@
     68 0000002C 4889E5                      mov rbp, rsp 
     69                                  
     70 0000002F E80C000000                  call Output         ; begin output
-    71 00000034 E831010000                  call BufferFlush    ; flush remaining part
+    71 00000034 E835010000                  call BufferFlush    ; flush remaining part
     72                                  
     73 00000039 B800000000                  mov rax, 0          ; quit
     74 0000003E C9                          leave               ;
@@ -272,32 +272,32 @@
    269 0000012C 483B1C25[00000000]          cmp rbx, [output_buf_shift]
    270 00000134 7F04                        jg _buf_store
    271 00000136 7409                        je _buf_flush  
-   272 00000138 7C13                        jl _buf_overflow
+   272 00000138 7C17                        jl _buf_overflow
    273                                  
    274                                  _buf_store:
-   275 0000013A E85A000000                  call BufferStore 
-   276 0000013F EB27                        jmp _buf_end 
+   275 0000013A E85E000000                  call BufferStore 
+   276 0000013F EB2B                        jmp _buf_end 
    277                                      
    278                                  _buf_flush:
-   279                                      ; push rax            ; rember not written symbol 
-   280                                      ; push rsi            ; and it's position 
-   281 00000141 E824000000                  call BufferFlush
-   282                                      ; pop rsi             ; return symbol 
-   283                                      ; pop rax             ; and position
-   284 00000146 E84E000000                  call BufferStore
-   285 0000014B EB1B                        jmp _buf_end 
+   279 00000141 50                          push rax            ; rember not written symbol 
+   280 00000142 56                          push rsi            ; and it's position 
+   281 00000143 E826000000                  call BufferFlush
+   282 00000148 5E                          pop rsi             ; return symbol 
+   283 00000149 58                          pop rax             ; and position
+   284 0000014A E84E000000                  call BufferStore
+   285 0000014F EB1B                        jmp _buf_end 
    286                                  
    287                                  _buf_overflow:
-   288 0000014D B801000000                  mov rax, 1
-   289 00000152 BF01000000                  mov rdi, 1
-   290 00000157 48BE-                       mov rsi, err_msg 
-   290 00000159 [4501000000000000] 
-   291 00000161 BA11000000                  mov rdx, err_len
-   292 00000166 EB00                        jmp _buf_end 
+   288 00000151 B801000000                  mov rax, 1
+   289 00000156 BF01000000                  mov rdi, 1
+   290 0000015B 48BE-                       mov rsi, err_msg 
+   290 0000015D [4501000000000000] 
+   291 00000165 BA11000000                  mov rdx, err_len
+   292 0000016A EB00                        jmp _buf_end 
    293                                  
    294                                  _buf_end:
-   295 00000168 C9                          leave
-   296 00000169 C3                          ret 
+   295 0000016C C9                          leave
+   296 0000016D C3                          ret 
    297                                  ;------------------------------------------------
    298                                  
    299                                  
@@ -311,21 +311,21 @@
    307                                  ;
    308                                  ;------------------------------------------------
    309                                  BufferFlush:
-   310 0000016A 55                          push rbp 
-   311 0000016B 4889E5                      mov rbp, rsp 
+   310 0000016E 55                          push rbp 
+   311 0000016F 4889E5                      mov rbp, rsp 
    312                                  
-   313 0000016E B801000000                  mov rax, 1
-   314 00000173 BF01000000                  mov rdi, 1
-   315 00000178 48BE-                       mov rsi, output_buf              
-   315 0000017A [0800000000000000] 
-   316 00000182 488B1425[00000000]          mov rdx, qword [output_buf_shift]                    
-   317 0000018A 0F05                        syscall                         ; buffer flush 
+   313 00000172 B801000000                  mov rax, 1
+   314 00000177 BF01000000                  mov rdi, 1
+   315 0000017C 48BE-                       mov rsi, output_buf              
+   315 0000017E [0800000000000000] 
+   316 00000186 488B1425[00000000]          mov rdx, qword [output_buf_shift]                    
+   317 0000018E 0F05                        syscall                         ; buffer flush 
    318                                  
-   319 0000018C 4831D2                      xor rdx, rdx 
-   320 0000018F 48891425[00000000]          mov [output_buf_shift], rdx 
+   319 00000190 4831D2                      xor rdx, rdx 
+   320 00000193 48891425[00000000]          mov [output_buf_shift], rdx 
    321                                  
-   322 00000197 C9                          leave
-   323 00000198 C3                          ret 
+   322 0000019B C9                          leave
+   323 0000019C C3                          ret 
    324                                  ;------------------------------------------------
    325                                  
    326                                  
@@ -340,17 +340,17 @@
    335                                  ;
    336                                  ;------------------------------------------------
    337                                  BufferStore:
-   338 00000199 55                          push rbp 
-   339 0000019A 4889E5                      mov rbp, rsp 
+   338 0000019D 55                          push rbp 
+   339 0000019E 4889E5                      mov rbp, rsp 
    340                                  
-   341 0000019D 48BF-                       mov rdi, output_buf 
-   341 0000019F [0800000000000000] 
-   342 000001A7 48033C25[00000000]          add rdi, [output_buf_shift]
-   343 000001AF AA                          stosb                           ; al --> rdi = buffer 
-   344 000001B0 48FF0425[00000000]          inc qword [output_buf_shift]
+   341 000001A1 48BF-                       mov rdi, output_buf 
+   341 000001A3 [0800000000000000] 
+   342 000001AB 48033C25[00000000]          add rdi, [output_buf_shift]
+   343 000001B3 AA                          stosb                           ; al --> rdi = buffer 
+   344 000001B4 48FF0425[00000000]          inc qword [output_buf_shift]
    345                                  
-   346 000001B8 C9                          leave
-   347 000001B9 C3                          ret 
+   346 000001BC C9                          leave
+   347 000001BD C3                          ret 
    348                                  ;------------------------------------------------
    349                                  
    350                                  
@@ -366,36 +366,36 @@
    360                                  ;
    361                                  ;------------------------------------------------
    362                                  _decimal_process: 
-   363 000001BA 4889F0                      mov rax, rsi                ; take number to convert 
-   364 000001BD 480FBFC0                    movsx rax, ax               ; int(4 bytes) to 8 bytes 
-   365 000001C1 50                          push rax 
-   366 000001C2 4883F800                    cmp rax, 0
-   367 000001C6 7D03                        jge _begin_convert_dec
-   368 000001C8 48F7D8                      neg rax
+   363 000001BE 4889F0                      mov rax, rsi                ; take number to convert 
+   364 000001C1 480FBFC0                    movsx rax, ax               ; int(4 bytes) to 8 bytes 
+   365 000001C5 50                          push rax 
+   366 000001C6 4883F800                    cmp rax, 0
+   367 000001CA 7D03                        jge _begin_convert_dec
+   368 000001CC 48F7D8                      neg rax
    369                                  
    370                                  _begin_convert_dec:
-   371 000001CB 48B9-                       mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
-   371 000001CD [2C01000000000000] 
-   372 000001D5 BB0A000000                  mov rbx, 10                 ; number system size 
+   371 000001CF 48B9-                       mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
+   371 000001D1 [2C01000000000000] 
+   372 000001D9 BB0A000000                  mov rbx, 10                 ; number system size 
    373                                  _convert_loop:
-   374 000001DA 4831D2                      xor rdx, rdx 
-   375 000001DD 48F7F3                      div rbx 
-   376 000001E0 80C230                      add dl, '0' 
-   377 000001E3 8811                        mov [rcx], dl               ; bytes count from 0, iteration from 1
-   378 000001E5 48FFC9                      dec rcx                     ;
-   379 000001E8 4885C0                      test rax, rax               ; cmp rax with 0
-   380 000001EB 75ED                        jne _convert_loop
+   374 000001DE 4831D2                      xor rdx, rdx 
+   375 000001E1 48F7F3                      div rbx 
+   376 000001E4 80C230                      add dl, '0' 
+   377 000001E7 8811                        mov [rcx], dl               ; bytes count from 0, iteration from 1
+   378 000001E9 48FFC9                      dec rcx                     ;
+   379 000001EC 4885C0                      test rax, rax               ; cmp rax with 0
+   380 000001EF 75ED                        jne _convert_loop
    381                                  
-   382 000001ED 58                          pop rax 
-   383 000001EE 4883F800                    cmp rax, 0 
-   384 000001F2 7D06                        jge _end_convert_dec
-   385 000001F4 C6012D                      mov byte [rcx], '-'
-   386 000001F7 48FFC9                      dec rcx 
+   382 000001F1 58                          pop rax 
+   383 000001F2 4883F800                    cmp rax, 0 
+   384 000001F6 7D06                        jge _end_convert_dec
+   385 000001F8 C6012D                      mov byte [rcx], '-'
+   386 000001FB 48FFC9                      dec rcx 
    387                                  
    388                                  _end_convert_dec:
-   389 000001FA 4889CE                      mov rsi, rcx                ; change number value to addr of string 
-   390 000001FD 48FFC6                      inc rsi                     ; подгон shift'a
-   391 00000200 E98DFEFFFF                  jmp _arg_process_end    
+   389 000001FE 4889CE                      mov rsi, rcx                ; change number value to addr of string 
+   390 00000201 48FFC6                      inc rsi                     ; подгон shift'a
+   391 00000204 E989FEFFFF                  jmp _arg_process_end    
    392                                  ;------------------------------------------------
    393                                  
    394                                  
@@ -411,23 +411,23 @@
    404                                  ;------------------------------------------------
    405                                  _octal_process:
    406                                  
-   407 00000205 4889F0                      mov rax, rsi                ; take number to convert 
-   408 00000208 48B9-                       mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
-   408 0000020A [2C01000000000000] 
-   409 00000212 BB08000000                  mov rbx, 8                  ; number system size 
+   407 00000209 4889F0                      mov rax, rsi                ; take number to convert 
+   408 0000020C 48B9-                       mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
+   408 0000020E [2C01000000000000] 
+   409 00000216 BB08000000                  mov rbx, 8                  ; number system size 
    410                                  _convert_dec_loop:
-   411 00000217 4831D2                      xor rdx, rdx 
-   412 0000021A 48F7F3                      div rbx 
-   413 0000021D 80C230                      add dl, '0' 
-   414 00000220 8811                        mov [rcx], dl               ; bytes count from 0, iteration from 1
-   415 00000222 48FFC9                      dec rcx                     ;
-   416 00000225 4885C0                      test rax, rax               ; cmp rax with 0
-   417 00000228 75ED                        jne _convert_dec_loop
+   411 0000021B 4831D2                      xor rdx, rdx 
+   412 0000021E 48F7F3                      div rbx 
+   413 00000221 80C230                      add dl, '0' 
+   414 00000224 8811                        mov [rcx], dl               ; bytes count from 0, iteration from 1
+   415 00000226 48FFC9                      dec rcx                     ;
+   416 00000229 4885C0                      test rax, rax               ; cmp rax with 0
+   417 0000022C 75ED                        jne _convert_dec_loop
    418                                  
-   419 0000022A 4889CE                      mov rsi, rcx
-   420 0000022D 48FFC6                      inc rsi 
+   419 0000022E 4889CE                      mov rsi, rcx
+   420 00000231 48FFC6                      inc rsi 
    421                                  
-   422 00000230 E95DFEFFFF                  jmp _arg_process_end
+   422 00000234 E959FEFFFF                  jmp _arg_process_end
    423                                  ;------------------------------------------------
    424                                  
    425                                  
@@ -443,23 +443,23 @@
    435                                  ;------------------------------------------------
    436                                  _hex_process:     
    437                                  
-   438 00000235 4889F0                      mov rax, rsi              ; take number to convert 
-   439 00000238 48B9-                       mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
-   439 0000023A [2C01000000000000] 
-   440 00000242 BB10000000                  mov rbx, 16                 ; number system size 
+   438 00000239 4889F0                      mov rax, rsi              ; take number to convert 
+   439 0000023C 48B9-                       mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
+   439 0000023E [2C01000000000000] 
+   440 00000246 BB10000000                  mov rbx, 16                 ; number system size 
    441                                  _convert_hex_loop:
-   442 00000247 4831D2                      xor rdx, rdx 
-   443 0000024A 48F7F3                      div rbx 
-   444 0000024D 8A92[30010000]              mov dl, [hex_digits + rdx]
-   445 00000253 8811                        mov [rcx], dl               ; bytes count from 0, iteration from 1
-   446 00000255 48FFC9                      dec rcx                     ;
-   447 00000258 4885C0                      test rax, rax               ; cmp rax with 0
-   448 0000025B 75EA                        jne _convert_hex_loop
+   442 0000024B 4831D2                      xor rdx, rdx 
+   443 0000024E 48F7F3                      div rbx 
+   444 00000251 8A92[30010000]              mov dl, [hex_digits + rdx]
+   445 00000257 8811                        mov [rcx], dl               ; bytes count from 0, iteration from 1
+   446 00000259 48FFC9                      dec rcx                     ;
+   447 0000025C 4885C0                      test rax, rax               ; cmp rax with 0
+   448 0000025F 75EA                        jne _convert_hex_loop
    449                                  
-   450 0000025D 4889CE                      mov rsi, rcx
-   451 00000260 48FFC6                      inc rsi 
+   450 00000261 4889CE                      mov rsi, rcx
+   451 00000264 48FFC6                      inc rsi 
    452                                  
-   453 00000263 E92AFEFFFF                  jmp _arg_process_end
+   453 00000267 E926FEFFFF                  jmp _arg_process_end
    454                                  ;------------------------------------------------
    455                                  
    456                                  
@@ -475,29 +475,29 @@
    466                                  ;------------------------------------------------
    467                                  _binar_process:    
    468                                  
-   469 00000268 4889F0                      mov rax, rsi                ; take number to convert 
-   470 0000026B 48B9-                       mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
-   470 0000026D [2C01000000000000] 
-   471 00000275 BB02000000                  mov rbx, 2                  ; number system size 
+   469 0000026C 4889F0                      mov rax, rsi                ; take number to convert 
+   470 0000026F 48B9-                       mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
+   470 00000271 [2C01000000000000] 
+   471 00000279 BB02000000                  mov rbx, 2                  ; number system size 
    472                                  _convert_bin_loop:
-   473 0000027A 4831D2                      xor rdx, rdx 
-   474 0000027D 48F7F3                      div rbx 
-   475 00000280 80C230                      add dl, '0' 
-   476 00000283 8811                        mov [rcx], dl               ; bytes count from 0, iteration from 1
-   477 00000285 48FFC9                      dec rcx                     ;
-   478 00000288 4885C0                      test rax, rax               ; cmp rax with 0
-   479 0000028B 75ED                        jne _convert_bin_loop
+   473 0000027E 4831D2                      xor rdx, rdx 
+   474 00000281 48F7F3                      div rbx 
+   475 00000284 80C230                      add dl, '0' 
+   476 00000287 8811                        mov [rcx], dl               ; bytes count from 0, iteration from 1
+   477 00000289 48FFC9                      dec rcx                     ;
+   478 0000028C 4885C0                      test rax, rax               ; cmp rax with 0
+   479 0000028F 75ED                        jne _convert_bin_loop
    480                                  
-   481 0000028D 4889CE                      mov rsi, rcx
-   482 00000290 48FFC6                      inc rsi 
+   481 00000291 4889CE                      mov rsi, rcx
+   482 00000294 48FFC6                      inc rsi 
    483                                  
-   484 00000293 E9FAFDFFFF                  jmp _arg_process_end
+   484 00000297 E9F6FDFFFF                  jmp _arg_process_end
    485                                  ;------------------------------------------------
    486                                  
    487                                  
    488                                  ;------------------------------------------------
    489                                  _string_process:  
-   490 00000298 E9F5FDFFFF                  jmp _arg_process_end
+   490 0000029C E9F1FDFFFF                  jmp _arg_process_end
    491                                  ;------------------------------------------------
    492                                  
    493                                  
@@ -513,10 +513,10 @@
    503                                  ;------------------------------------------------
    504                                  _char_process:
    505                                      
-   506 0000029D 48893425[2E010000]          mov [char_buf], rsi
-   507 000002A5 48BE-                       mov rsi, char_buf
-   507 000002A7 [2E01000000000000] 
+   506 000002A1 48893425[2E010000]          mov [char_buf], rsi
+   507 000002A9 48BE-                       mov rsi, char_buf
+   507 000002AB [2E01000000000000] 
    508                                  
-   509 000002AF E9DEFDFFFF                  jmp _arg_process_end
+   509 000002B3 E9DAFDFFFF                  jmp _arg_process_end
    510                                  ;------------------------------------------------
    511                                  
