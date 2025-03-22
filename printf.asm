@@ -5,6 +5,8 @@
 ;   stack: [R9] = 1 --> 2 --> 3 --> ... 
 ;               +1*8  +2*8  +3*8  ...
 ;------------------------------------------------
+%include "print_macros.inc"
+;------------------------------------------------
 section .data
     output_buf_shift:     dq 0
     output_buf: times 256 db 0       
@@ -18,22 +20,6 @@ section .data
     char_buf: times 2 db 0 
 
     digits: db '0123456789abcdef', 0
-
-    IS_ARG      dw 1         ; const 
-    NO_ARG      dw 7         ; const 
-
-    DECIMAL     equ 0         ; const %d  |
-    OCTAL       equ 1         ; const %o  |
-    HEXADEMICAL equ 2         ; const %x  | 
-    BINAR       equ 3         ; const %b  |--------->>> Формируется джамп таблица 
-    STRING      equ 4         ; const %s  |
-    CHAR        equ 5         ; const %c  |
-    PERCENT     equ 6         ; const %%  |
-    
-    err_msg: db 'Buffer oerflowed', 0
-    err_len equ $ - err_msg 
-
-    new_line: db 10, 0
 ;------------------------------------------------
 
 section .text
@@ -41,18 +27,38 @@ section .text
 
 ;------------------------------------------------
 ;               JUMP TABLE 
-_arg_process:
-    jmp _decimal_process    ;|
-    jmp _octal_process      ;|
-    jmp _hex_process        ;|
-    jmp _binar_process      ;|<<--------- Jump Table 
-    jmp _string_process     ;|
-    jmp _char_process       ;|
-    jmp _percent_process    ;|
+_jump_table:
+    
+    times 5 db 0            ; 'a'
+    jmp _binar_process      ; 'b'
+    jmp _char_process       ; 'c'
+    jmp _decimal_process    ; 'd'
+    times 5 db 0            ; 'e'
+    times 5 db 0            ; 'f'
+    times 5 db 0            ; 'g'
+    times 5 db 0            ; 'h'
+    times 5 db 0            ; 'i'
+    times 5 db 0            ; 'j'
+    times 5 db 0            ; 'k'
+    times 5 db 0            ; 'l'
+    times 5 db 0            ; 'm'
+    times 5 db 0            ; 'n'
+    jmp _octal_process      ; 'o'        
+    times 5 db 0            ; 'p'
+    times 5 db 0            ; 'q'
+    times 5 db 0            ; 'r'
+    jmp _string_process     ; 's'
+    times 5 db 0            ; 't'
+    times 5 db 0            ; 'u'
+    times 5 db 0            ; 'v'
+    times 5 db 0            ; 'w'
+    jmp _hex_process        ; 'x'
+    times 5 db 0            ; 'y'
+    times 5 db 0            ; 'z'
 ;------------------------------------------------
 
 MyPrintf:   
-; ----------------
+;-----------------
     pop rax     ; save return addr 
 
     push r9     ;
@@ -61,7 +67,9 @@ MyPrintf:
     push rdx    ;  
     push rsi    ;
     push rdi    ;
-    mov r9, rsp ; <======  DON'T TOUCH THIS MAN !!!!!!!!
+
+;pointer to arguments 
+    mov r9, rsp ; <======  DON'T TOUCH THIS MAN !!!!!!!! 
     
     push rax    ; push return addr
 ;----------------
@@ -71,8 +79,7 @@ MyPrintf:
 
     mov qword [arg_counter], 1
     call Output         ; begin output
-    call BufferFlush    ; flush remaining part
-    call BufferClear    ; clear for next calling of MyPrintf
+    BufferFlush    ; flush remaining part
 
     xor rsi, rsi 
     xor rdi, rdi 
@@ -85,11 +92,11 @@ MyPrintf:
 
 ;------------------------------------------------
 ;               (Output)
-;    
 ; Entry:
-;
+;   nothing
 ; Exit:
-;
+;   takes symbol from format string and sends 
+;   it to Putchar to print it 
 ;------------------------------------------------
 Output:
     push rbp 
@@ -122,25 +129,37 @@ _output_end:
 ;   Moves symbols to the buffer  
 ;
 ; Entry:
-;
+;   al = current outputed symbol 
 ; Exit:
-;
+;   if symbol is regular, outputs it
+;   if it is argument calls, inserts argument 
+;   with the help of other funcs 
 ;------------------------------------------------
 Putchar:
-    cmp al, '%'                    ;TODO: добавить IsArgument проверку по следующему символу 
+    cmp al, '%'
 ;if( != % )
     jne _putc_write
 ;else
+    xor rax, rax
     lodsb                   ; skip %, go to next symbol
-    call ArgType  
+;if( <= 'a' || >= 'z', just write )
+    cmp al, 'a'
+    jle _putc_write
+    cmp al, 'z'
+    jge _putc_write
+;else if( == % )
+    cmp al, '%'
+    je _putc_write
+;else 
     push rsi                ; save shift in format string
-
     mov rsi, [arg_counter]  ; shift from  
     imul rsi, 8             ; beginning 
     add rsi, r9             ; begin of args in stack
     mov rsi, [rsi]
 
-    mov rdx, _arg_process   ;
+    sub al, 'a'             ; count shift from begin of jump table
+    movzx rax, al
+    mov rdx, _jump_table    ;
     imul rax, 5             ; modifing addres of jump
     add rdx, rax            ;
     jmp rdx                 ; process argument
@@ -149,9 +168,8 @@ _arg_process_end:
     pop rsi                 ; return shift in format string
     jmp Putchar_end  
 
-
 _putc_write: 
-    call BufferHandler  
+    BufferStore
     jmp Putchar_end 
 ;------------------------------------------------
 
@@ -180,7 +198,7 @@ _overwrite:
 
     lodsb                   ; rsi -->> al
     push rsi 
-    call BufferHandler      ; al -->> rdi 
+    BufferStore             ; al -->> rdi 
     pop rsi 
 
     xor rcx, rcx            ; 
@@ -198,201 +216,8 @@ _overwrite_end:
 
 
 ;------------------------------------------------
-;               (ArgType)
-;   Returns the type of ArgType 
-;
-; Entry:
-;   al = symbol 
-; Exit:
-;   rax = code of specifier
-;------------------------------------------------
-ArgType:
-    push rbp 
-    mov rbp, rsp 
-
-
-    mov bl, 'd'
-    cmp bl, al 
-    je _arg_is_dec 
-
-    mov bl, 'o'
-    cmp bl, al                          ; МОЖНО ДЖАМП ТАБЛИЦУ ЕБАНУТЬ 
-    je _arg_is_oct 
-
-    mov bl, 'x'
-    cmp bl, al 
-    je _arg_is_hex
-
-    mov bl, 'b'
-    cmp bl, al 
-    je _arg_is_bin
-
-    mov bl, 's'
-    cmp bl, al 
-    je _arg_is_str
-
-    mov bl, 'c'
-    cmp bl, al 
-    je _arg_is_chr
-
-    mov bl, '%'
-    cmp bl, al
-    je _arg_is_not_arg
-
-
-_arg_is_dec:
-    mov rax, qword DECIMAL 
-    jmp _ArgType_end
-_arg_is_oct:
-    mov rax, qword OCTAL  
-    jmp _ArgType_end
-_arg_is_hex:
-    mov rax, qword HEXADEMICAL 
-    jmp _ArgType_end
-_arg_is_bin:
-    mov rax, qword BINAR
-    jmp _ArgType_end
-_arg_is_str:
-    mov rax, qword STRING 
-    jmp _ArgType_end
-_arg_is_chr:
-    mov rax, qword CHAR
-    jmp _ArgType_end
-_arg_is_not_arg:
-    mov rax, qword PERCENT
-    jmp _ArgType_end
-
-
-_ArgType_end:
-    leave 
-    ret 
-;------------------------------------------------
-
-
-;------------------------------------------------
-;               (BufferHandler)
-;   Handles the flushing of buffer 
-;
-; Entry:
-;   al = symbol to write 
-; Exit:
-;
-;------------------------------------------------
-BufferHandler:
-    push rbp 
-    mov rbp, rsp 
-
-    mov rbx, output_buf_size
-    cmp rbx, [output_buf_shift]
-    jg _buf_store
-    je _buf_flush  
-    jl _buf_overflow
-
-_buf_store:
-    call BufferStore 
-    jmp _buf_end 
-    
-_buf_flush:
-    push rax            ; rember not written symbol 
-    push rsi            ; and it's position 
-    call BufferFlush
-    pop rsi             ; return symbol 
-    pop rax             ; and position
-    call BufferStore
-    jmp _buf_end 
-
-_buf_overflow:
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, err_msg 
-    mov rdx, err_len
-    jmp _buf_end 
-
-_buf_end:
-    leave
-    ret 
-;------------------------------------------------
-
-
-;------------------------------------------------
-;               (BufferFlush)
-;   Manual mode of flushing buffer 
-;
-; Entry:
-;  
-; Exit:
-;
-;------------------------------------------------
-BufferFlush:
-    push rbp 
-    mov rbp, rsp 
-
-    mov rax, 1
-    mov rdi, 1
-    mov rsi, output_buf              
-    mov rdx, qword [output_buf_shift]                    
-    syscall                         ; buffer flush 
-
-    xor rdx, rdx 
-    mov [output_buf_shift], rdx 
-
-    leave
-    ret 
-;------------------------------------------------
-
-
-;------------------------------------------------
-;               (BufferStore)
-;   Manual mode of storing buffer 
-;
-; Entry:
-;
-; Exit:
-;
-;------------------------------------------------
-BufferStore:
-    push rbp 
-    mov rbp, rsp 
-
-    mov rdi, output_buf 
-    add rdi, [output_buf_shift]
-    stosb                           ; al --> rdi = buffer 
-    inc qword [output_buf_shift]
-
-    leave
-    ret 
-;------------------------------------------------
-
-
-;------------------------------------------------
-;               (BufferClear)
-;   Clears buffer (needed fo multiple calling 
-;   of Myprintf) 
-;
-; Entry:
-;
-; Exit:
-;
-;------------------------------------------------
-BufferClear:
-    push rbp 
-    mov rbp, rsp 
-
-    mov rcx, output_buf_size
-    mov rdi, output_buf 
-    mov al, 0
-_buf_clear_loop:
-    stosb                           ; al --> rdi = buffer 
-    loop _buf_clear_loop 
-
-    leave
-    ret 
-;------------------------------------------------
-
-
-;------------------------------------------------
-;   Changes symbol in the stack to addr of
-;   it's string representation ended with \0
+;   Convert number, place it to string 
+;   ended with \0
 ;
 ; Entry: rsi points to argument
 ;
@@ -419,7 +244,6 @@ _convert_loop:
     dec rcx                     ;
     test rax, rax               ; cmp rax with 0
     jne _convert_loop
-
     pop rax 
     cmp rax, 0 
     jge _end_convert_dec
@@ -429,21 +253,8 @@ _convert_loop:
 _end_convert_dec:
     mov rsi, rcx                ; change number value to addr of string 
     inc rsi                     ; подгон shift'a
-    jmp _arg_process_end    
-;------------------------------------------------
+    jmp _arg_process_end        ; EXIT
 
-
-;------------------------------------------------
-;   Changes symbol in the stack to addr of
-;   it's string representation ended with \0
-;
-; Entry: rsi points to argument
-;
-; Exit: rsi points to string, that contains 
-;       ready to print argument 
-;
-;------------------------------------------------
-_numbers_process:
 
 _octal_process:
     mov rbx, 8                  ; number system size 
@@ -467,56 +278,16 @@ _convert_num_loop:
     dec rcx                     ;
     test rax, rax               ; cmp rax with 0
     jne _convert_num_loop
-
     mov rsi, rcx
     inc rsi 
+    jmp _arg_process_end        ; EXIT 
 
-    jmp _arg_process_end
-;------------------------------------------------
-
-
-;------------------------------------------------
-_string_process:  
-    jmp _arg_process_end
-;------------------------------------------------
-
-
-;------------------------------------------------
-;   Changes symbol in the stack to addr of
-;   it's string representation ended with \0
-;
-; Entry: rsi points to argument
-;
-; Exit: rsi points to string, that contains 
-;       ready to print argument 
-;
-;------------------------------------------------
 _char_process:
-    
     mov rdx, rsi
     mov [char_buf], dl
     mov rsi, char_buf
+    jmp _arg_process_end        ; EXIT 
 
-    jmp _arg_process_end
-;------------------------------------------------
-
-
-;------------------------------------------------
-;   Changes symbol in the stack to addr of
-;   it's string representation ended with \0
-;
-; Entry: rsi points to argument
-;
-; Exit: rsi points to string, that contains 
-;       ready to print argument 
-;
-;------------------------------------------------
-_percent_process:
-
-    mov dl, '%'
-    mov [char_buf], dl
-    mov rsi, char_buf
-    sub qword [arg_counter], 1
-
-    jmp _arg_process_end
+_string_process:  
+    jmp _arg_process_end        ; EXIT 
 ;------------------------------------------------
