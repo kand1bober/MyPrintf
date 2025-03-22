@@ -17,7 +17,7 @@ section .data
 
     char_buf: times 2 db 0 
 
-    hex_digits: db '0123456789abcdef', 0
+    digits: db '0123456789abcdef', 0
 
     IS_ARG      dw 1         ; const 
     NO_ARG      dw 7         ; const 
@@ -443,81 +443,30 @@ _end_convert_dec:
 ;       ready to print argument 
 ;
 ;------------------------------------------------
+_numbers_process:
+
 _octal_process:
-
-    mov rax, rsi                ; take number to convert 
-    mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
     mov rbx, 8                  ; number system size 
-_convert_dec_loop:
-    xor rdx, rdx 
-    div rbx 
-    add dl, '0' 
-    mov [rcx], dl               ; bytes count from 0, iteration from 1
-    dec rcx                     ;
-    test rax, rax               ; cmp rax with 0
-    jne _convert_dec_loop
-
-    mov rsi, rcx
-    inc rsi 
-
-    jmp _arg_process_end
-;------------------------------------------------
-
-
-;------------------------------------------------
-;   Changes symbol in the stack to addr of
-;   it's string representation ended with \0
-;
-; Entry: rsi points to argument
-;
-; Exit: rsi points to string, that contains 
-;       ready to print argument 
-;
-;------------------------------------------------
-_hex_process:     
-
-    mov rax, rsi                ; take number to convert 
-    mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
-    mov rbx, 16                 ; number system size 
-_convert_hex_loop:
-    xor rdx, rdx 
-    div rbx 
-    mov dl, [hex_digits + rdx]
-    mov [rcx], dl               ; bytes count from 0, iteration from 1
-    dec rcx                     ;
-    test rax, rax               ; cmp rax with 0
-    jne _convert_hex_loop
-
-    mov rsi, rcx
-    inc rsi 
-
-    jmp _arg_process_end
-;------------------------------------------------
-
-
-;------------------------------------------------
-;   Changes symbol in the stack to addr of
-;   it's string representation ended with \0
-;
-; Entry: rsi points to argument
-;
-; Exit: rsi points to string, that contains 
-;       ready to print argument 
-;
-;------------------------------------------------
-_binar_process:    
-
-    mov rax, rsi                ; take number to convert 
-    mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
+    jmp _begin_num_convert
+_hex_process:
+    mov rbx, 16                  ; number system size 
+    jmp _begin_num_convert
+_binar_process:
     mov rbx, 2                  ; number system size 
-_convert_bin_loop:
+    jmp _begin_num_convert
+
+
+_begin_num_convert:
+    mov rax, rsi                ; take number to convert 
+    mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
+_convert_num_loop:
     xor rdx, rdx 
     div rbx 
-    add dl, '0' 
+    mov dl, [digits + rdx] 
     mov [rcx], dl               ; bytes count from 0, iteration from 1
     dec rcx                     ;
     test rax, rax               ; cmp rax with 0
-    jne _convert_bin_loop
+    jne _convert_num_loop
 
     mov rsi, rcx
     inc rsi 
