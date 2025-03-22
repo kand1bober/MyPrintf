@@ -3,4 +3,4 @@
 работу функции printf языка С 
 
 # Результат тестового сравнения с оригинальным printf:
-<img src="result.png" width="800" height="380">
+<img src="result.png" >
