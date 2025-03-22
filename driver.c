@@ -7,6 +7,13 @@ int main( int argc, char* argv[] )
     printf("%c", '\0');
 
     int a = 0;
+    a = MyPrintf("ASCII Table:\n\n"
+                 "hex  oct   dec  char\n\n");
+
+    for( char i = 'a'; i <= 'z'; i++ )
+    {
+        a = MyPrintf("%x = %o = %d = %c\n", (int)i, (int)i, (int)i, i );
+    }
 
     // a = MyPrintf("%d %c %o %b \n"
     //             "My uncle was a man of virture, \n"
@@ -37,11 +44,6 @@ int main( int argc, char* argv[] )
 
     //             "God damn old man, why ain't you gone?'\n",
     //             -1313, 90, 235, 1313 );
-
-    a = MyPrintf("Hello %c\n", 65 );
-    a = MyPrintf("Hello %c\n", 65 );
-    a = MyPrintf("Hello %c\n", 65 );
-    a = MyPrintf("Hello %c\n", 65 );
 
     return 0;
 }

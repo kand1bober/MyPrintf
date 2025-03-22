@@ -67,8 +67,13 @@ MyPrintf:
     push rbp 
     mov rbp, rsp 
 
+    mov qword [arg_counter], 1
     call Output         ; begin output
     call BufferFlush    ; flush remaining part
+    call BufferClear    ; clear for next calling of MyPrintf
+
+    xor rsi, rsi 
+    xor rdi, rdi 
 
     mov rax, 0          ; quit
     leave               ;
@@ -326,7 +331,6 @@ BufferFlush:
 ;------------------------------------------------
 
 
-
 ;------------------------------------------------
 ;               (BufferStore)
 ;   Manual mode of storing buffer 
@@ -349,6 +353,31 @@ BufferStore:
     ret 
 ;------------------------------------------------
 
+
+;------------------------------------------------
+;               (BufferClear)
+;   Clears buffer (needed fo multiple calling 
+;   of Myprintf) 
+;
+; Entry:
+;
+; Exit:
+;
+;------------------------------------------------
+BufferClear:
+    push rbp 
+    mov rbp, rsp 
+
+    mov rcx, output_buf_size
+    mov rdi, output_buf 
+    mov al, 0
+_buf_clear_loop:
+    stosb                           ; al --> rdi = buffer 
+    loop _buf_clear_loop 
+
+    leave
+    ret 
+;------------------------------------------------
 
 
 ;------------------------------------------------
