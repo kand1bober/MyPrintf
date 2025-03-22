@@ -15,7 +15,7 @@ section .data
     convert_num_buf: times 30 db 0  ; can fit any number, and unused bytes will be 0( print nothing )
     convert_num_buf_size equ $ - convert_num_buf
 
-    char_buf: db 0, 0 
+    char_buf: times 2 db 0 
 
     hex_digits: db '0123456789abcdef', 0
 
@@ -28,6 +28,7 @@ section .data
     BINAR       equ 3         ; const %b  |--------->>> Формируется джамп таблица 
     STRING      equ 4         ; const %s  |
     CHAR        equ 5         ; const %c  |
+    PERCENT     equ 6         ; const %%  |
     
     err_msg: db 'Buffer oerflowed', 0
     err_len equ $ - err_msg 
@@ -47,6 +48,7 @@ _arg_process:
     jmp _binar_process      ;|<<--------- Jump Table 
     jmp _string_process     ;|
     jmp _char_process       ;|
+    jmp _percent_process    ;|
 ;------------------------------------------------
 
 MyPrintf:   
@@ -208,6 +210,7 @@ ArgType:
     push rbp 
     mov rbp, rsp 
 
+
     mov bl, 'd'
     cmp bl, al 
     je _arg_is_dec 
@@ -232,6 +235,10 @@ ArgType:
     cmp bl, al 
     je _arg_is_chr
 
+    mov bl, '%'
+    cmp bl, al
+    je _arg_is_not_arg
+
 
 _arg_is_dec:
     mov rax, qword DECIMAL 
@@ -250,6 +257,9 @@ _arg_is_str:
     jmp _ArgType_end
 _arg_is_chr:
     mov rax, qword CHAR
+    jmp _ArgType_end
+_arg_is_not_arg:
+    mov rax, qword PERCENT
     jmp _ArgType_end
 
 
@@ -466,7 +476,7 @@ _convert_dec_loop:
 ;------------------------------------------------
 _hex_process:     
 
-    mov rax, rsi              ; take number to convert 
+    mov rax, rsi                ; take number to convert 
     mov rcx, convert_num_buf + convert_num_buf_size - 2   ; redirect to string, containing result 
     mov rbx, 16                 ; number system size 
 _convert_hex_loop:
@@ -541,3 +551,23 @@ _char_process:
     jmp _arg_process_end
 ;------------------------------------------------
 
+
+;------------------------------------------------
+;   Changes symbol in the stack to addr of
+;   it's string representation ended with \0
+;
+; Entry: rsi points to argument
+;
+; Exit: rsi points to string, that contains 
+;       ready to print argument 
+;
+;------------------------------------------------
+_percent_process:
+
+    mov dl, '%'
+    mov [char_buf], dl
+    mov rsi, char_buf
+    sub qword [arg_counter], 1
+
+    jmp _arg_process_end
+;------------------------------------------------
