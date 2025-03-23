@@ -28,33 +28,32 @@ section .text
 ;------------------------------------------------
 ;               JUMP TABLE 
 _jump_table:
-    
-    times 5 db 0            ; 'a'
-    jmp _binar_process      ; 'b'
-    jmp _char_process       ; 'c'
-    jmp _decimal_process    ; 'd'
-    times 5 db 0            ; 'e'
-    times 5 db 0            ; 'f'
-    times 5 db 0            ; 'g'
-    times 5 db 0            ; 'h'
-    times 5 db 0            ; 'i'
-    times 5 db 0            ; 'j'
-    times 5 db 0            ; 'k'
-    times 5 db 0            ; 'l'
-    times 5 db 0            ; 'm'
-    times 5 db 0            ; 'n'
-    jmp _octal_process      ; 'o'        
-    times 5 db 0            ; 'p'
-    times 5 db 0            ; 'q'
-    times 5 db 0            ; 'r'
-    jmp _string_process     ; 's'
-    times 5 db 0            ; 't'
-    times 5 db 0            ; 'u'
-    times 5 db 0            ; 'v'
-    times 5 db 0            ; 'w'
-    jmp _hex_process        ; 'x'
-    times 5 db 0            ; 'y'
-    times 5 db 0            ; 'z'
+    times 8 db 0            ; 'a'
+    dq _binar_process       ; 'b'
+    dq _char_process        ; 'c'
+    dq _decimal_process     ; 'd'
+    times 8 db 0            ; 'e'
+    times 8 db 0            ; 'f'
+    times 8 db 0            ; 'g'
+    times 8 db 0            ; 'h'
+    times 8 db 0            ; 'i'
+    times 8 db 0            ; 'j'
+    times 8 db 0            ; 'k'
+    times 8 db 0            ; 'l'
+    times 8 db 0            ; 'm'
+    times 8 db 0            ; 'n'
+    dq _octal_process       ; 'o'        
+    times 8 db 0            ; 'p'
+    times 8 db 0            ; 'q'
+    times 8 db 0            ; 'r'
+    dq _string_process      ; 's'
+    times 8 db 0            ; 't'
+    times 8 db 0            ; 'u'
+    times 8 db 0            ; 'v'
+    times 8 db 0            ; 'w'
+    dq _hex_process         ; 'x'
+    times 8 db 0            ; 'y'
+    times 8 db 0            ; 'z'
 ;------------------------------------------------
 
 MyPrintf:   
@@ -64,8 +63,8 @@ MyPrintf:
     push r9     ;
     push r8     ; 
     push rcx    ;  saving arguments 
-    push rdx    ;  
-    push rsi    ;
+    push rdx    ;  from registers to 
+    push rsi    ;  stack 
     push rdi    ;
 
 ;pointer to arguments 
@@ -144,9 +143,9 @@ Putchar:
     lodsb                   ; skip %, go to next symbol
 ;if( <= 'a' || >= 'z', just write )
     cmp al, 'a'
-    jle _putc_write
+    jle _putc_write_back
     cmp al, 'z'
-    jge _putc_write
+    jge _putc_write_back 
 ;else if( == % )
     cmp al, '%'
     je _putc_write
@@ -158,15 +157,22 @@ Putchar:
     mov rsi, [rsi]
 
     sub al, 'a'             ; count shift from begin of jump table
-    movzx rax, al
+    xor rdx, rdx 
     mov rdx, _jump_table    ;
-    imul rax, 5             ; modifing addres of jump
+    imul rax, 8             ; modifing addres of jump
     add rdx, rax            ;
+    mov rdx, [rdx]
     jmp rdx                 ; process argument
 _arg_process_end: 
     call OverwriteArg 
     pop rsi                 ; return shift in format string
     jmp Putchar_end  
+
+_putc_write_back:           ; if % faced, but no specificator after
+    push rax  
+    mov al, '%'
+    BufferStore
+    pop rax
 
 _putc_write: 
     BufferStore
@@ -260,7 +266,7 @@ _octal_process:
     mov rbx, 8                  ; number system size 
     jmp _begin_num_convert
 _hex_process:
-    mov rbx, 16                  ; number system size 
+    mov rbx, 16                 ; number system size 
     jmp _begin_num_convert
 _binar_process:
     mov rbx, 2                  ; number system size 

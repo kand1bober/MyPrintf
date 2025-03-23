@@ -30,6 +30,8 @@ int main( int argc, char* argv[] )
     -1,
     "love", 3802, 100, 33, 127);
 
+    // MyPrintf("Hello %!\n");
+
     return 0;
 }
 
